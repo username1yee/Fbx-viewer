@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>3D FBX Professional Studio V9</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+    body{
+        margin:0;
+        overflow:hidden;
+        background:#050505;
+        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+        touch-action:none;
+    }
+
+    #canvas-container{
+        width:100vw;
+        height:100vh;
+    }
+
+    .glass{
+        background:rgba(22,22,22,0.95);
+        backdrop-filter:blur(25px);
+        border-top:1px solid rgba(255,255,255,0.1);
+    }
+
+    input[type=range]{
+        -webkit-appearance:none;
+        width:100%;
+        height:6px;
+        background:rgba(255,255,255,0.1);
+        border-radius:3px;
+        outline:none;
+    }
+
+    input[type=range]::-webkit-slider-thumb{
+        -webkit-appearance:none;
+        width:18px;
+        height:18px;
+        border-radius:50%;
+        background:#3b82f6;
+        cursor:pointer;
+        box-shadow:0 0 8px rgba(59,130,246,0.5);
+    }
+
+    .toggle-btn{
+        background:rgba(255,255,255,0.05);
+        border:1px solid rgba(255,255,255,0.1);
+        color:#888;
+        transition:all .2s;
+    }
+
+    .toggle-btn.active{
+        background:#3b82f6;
+        color:white;
+        border-color:#60a5fa;
+    }
+
+    .action-btn:disabled{
+        opacity:.2;
+        cursor:not-allowed;
+        pointer-events:none;
+    }
+
+    #bg-color-input{
+        -webkit-appearance:none;
+        border:none;
+        width:24px;
+        height:24px;
+        border-radius:4px;
+        background:none;
+        cursor:pointer;
+    }
+
+    #bg-color-input::-webkit-color-swatch{
+        border:1px solid rgba(255,255,255,0.2);
+        border-radius:4px;
+    }
+
+    .no-scrollbar::-webkit-scrollbar{
+        display:none;
+    }
+
+    /* PORTRAIT */
+    #bottom-menu{
+        transition:transform .4s cubic-bezier(.4,0,.2,1);
+        transform:translateY(calc(100% - 70px));
+        padding-bottom:env(safe-area-inset-bottom);
+    }
+
+    #bottom-menu.is-open{
+        transform:translateY(0);
+    }
+
+    /* LANDSCAPE */
+    @media (orientation: landscape){
+
+        #bottom-menu{
+            top:0;
+            right:0;
+            left:auto;
+            bottom:auto;
+
+            width:380px;
+            height:100vh;
+
+            border-top:none;
+            border-left:1px solid rgba(255,255,255,0.1);
+
+            border-radius:2rem 0 0 2rem;
+
+            transform:translateX(calc(100% - 70px));
+            padding-bottom:0;
+        }
+
+        #bottom-menu.is-open{
+            transform:translateX(0);
+        }
+
+        #menu-handle{
+            width:70px;
+            height:100%;
+            position:absolute;
+            left:-70px;
+            top:0;
+
+            background:rgba(22,22,22,.95);
+            backdrop-filter:blur(25px);
+
+            border-left:1px solid rgba(255,255,255,0.1);
+            border-top:1px solid rgba(255,255,255,0.1);
+
+            border-radius:2rem 0 0 2rem;
+
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+        }
+
+        #menu-handle div{
+            width:4px !important;
+            height:70px !important;
+        }
+
+        #menu-content{
+            height:100%;
+            overflow-y:auto;
+        }
+    }
+</style>
+</head>
+
+<body>
+
+<!-- TOP BAR -->
+<div class="fixed top-4 left-4 right-4 pointer-events-none z-10 flex justify-between items-start">
+    <div class="bg-black/60 backdrop-blur-md p-3 rounded-2xl border border-white/10 text-white pointer-events-auto shadow-2xl">
+        <h1 class="text-[10px] font-black uppercase tracking-widest text-blue-500">
+            FBX Studio V9
+        </h1>
+    </div>
+
+    <div id="info-panel" class="hidden bg-black/60 backdrop-blur-md p-3 rounded-2xl border border-white/10 text-white text-[10px] pointer-events-auto min-w-[140px]">
+        <div id="model-name" class="font-bold truncate max-w-[120px]">
+            No Model Loaded
+        </div>
+
+        <div id="selected-bone-info" class="text-blue-400 mt-1 font-mono">
+            Bone: None
+        </div>
+
+        <div id="poly-count" class="opacity-40 mt-1">
+            Polys: 0
+        </div>
+    </div>
+</div>
+
+<!-- UPLOAD -->
+<div id="upload-hub" class="fixed inset-0 flex items-center justify-center z-20 pointer-events-auto">
+    <div id="drop-zone" class="bg-gray-900/90 backdrop-blur-2xl p-12 rounded-[3rem] flex flex-col items-center gap-6 text-white/70 border-2 border-dashed border-white/10 hover:border-blue-500 transition-all cursor-pointer mx-6 shadow-2xl">
+
+        <div class="bg-blue-600 p-5 rounded-full shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"
+                 viewBox="0 0 24 24" fill="none"
+                 stroke="white" stroke-width="2"
+                 stroke-linecap="round"
+                 stroke-linejoin="round">
+
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </div>
+
+        <div class="text-center">
+            <p class="font-bold text-white text-xl">Import FBX Model</p>
+            <p class="text-xs opacity-50 mt-2">
+                Supports Advanced Lighting
+            </p>
+        </div>
+
+        <input type="file" id="fbx-input" class="hidden" accept=".fbx"/>
+    </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="bottom-menu" class="fixed bottom-0 left-0 right-0 glass rounded-t-[2.5rem] z-30 pointer-events-auto hidden">
+
+    <div id="menu-handle" class="h-[70px] flex flex-col items-center justify-start pt-3 cursor-pointer">
+        <div class="w-12 h-1 bg-white/20 rounded-full mb-2"></div>
+        <span class="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">
+            Dashboard
+        </span>
+    </div>
+
+    <div id="menu-content" class="px-6 pb-12 max-h-[75vh] overflow-y-auto no-scrollbar space-y-8">
+
+        <!-- DISPLAY -->
+        <section class="space-y-4">
+
+            <div class="flex items-center justify-between">
+                <h3 class="text-white/40 text-[9px] font-black uppercase tracking-widest">
+                    Display Controls
+                </h3>
+
+                <div class="flex gap-2">
+                    <button id="btn-undo" disabled class="action-btn px-4 py-1.5 bg-white/10 text-white rounded-lg text-[10px] font-bold uppercase border border-white/10 transition-all">
+                        Undo
+                    </button>
+
+                    <button id="btn-redo" disabled class="action-btn px-4 py-1.5 bg-white/10 text-white rounded-lg text-[10px] font-bold uppercase border border-white/10 transition-all">
+                        Redo
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button id="btn-pure-mode" class="toggle-btn py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5">
+                    Pure Mode
+                </button>
+
+                <button id="btn-pause-anim" class="toggle-btn py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest">
+                    Pause Anim
+                </button>
+
+                <button id="btn-show-bones" class="toggle-btn py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest">
+                    Show Bones
+                </button>
+
+                <button id="btn-xray-bones" class="toggle-btn py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest active">
+                    X-Ray Bones
+                </button>
+                
+                <button id="btn-mist-pass" class="toggle-btn py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest">
+                    Mist Pass
+                </button>
+                
+                <button id="btn-normal-pass" class="toggle-btn py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest">
+                    Normal Pass
+                </button>
+                
+                <button id="btn-fullscreen" class="toggle-btn py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest">
+                    Fullscreen
+                </button>
+            </div>
+            <!-- MIST PASS -->
+            <div id="mist-controls"
+            class="hidden space-y-5 bg-white/5 p-5 rounded-[2rem] border border-white/5">
+            
+                <h3 class="text-white/40 text-[9px] font-black uppercase tracking-widest">
+                    Mist Pass
+                </h3>
+            
+                <!-- START -->
+                <div class="space-y-2">
+                    <div class="flex justify-between text-[10px] text-gray-400 font-bold uppercase px-1">
+                        <span>Start</span>
+                        <span id="mist-start-val">0</span>
+                    </div>
+            
+                    <input type="range" id="mist-start" min="0" max="200" value="0">
+                </div>
+            
+                <!-- END -->
+                <div class="space-y-2">
+                    <div class="flex justify-between text-[10px] text-gray-400 font-bold uppercase px-1">
+                        <span>End</span>
+                        <span id="mist-end-val">40</span>
+                    </div>
+            
+                    <input type="range" id="mist-end" min="1" max="500" value="40">
+                </div>
+            
+                <!-- STRENGTH -->
+                <div class="space-y-2">
+                    <div class="flex justify-between text-[10px] text-gray-400 font-bold uppercase px-1">
+                        <span>Strength</span>
+                        <span id="mist-strength-val">1.0</span>
+                    </div>
+            
+                    <input type="range" id="mist-strength" min="0" max="3" step="0.01" value="1">
+                </div>
+            
+                <!-- COLOR RAMP -->
+                <div class="space-y-4">
+            
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] uppercase text-white/50">Near</span>
+                        <input type="color" id="mist-near" value="#000000">
+                    </div>
+            
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] uppercase text-white/50">Middle</span>
+                        <input type="color" id="mist-mid" value="#777777">
+                    </div>
+            
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] uppercase text-white/50">Far</span>
+                        <input type="color" id="mist-far" value="#ffffff">
+                    </div>
+            
+                </div>
+            
+            </div>
+        </section>
+        
+
+        <!-- TRANSFORM -->
+        <section class="space-y-4">
+
+            <h3 class="text-white/40 text-[9px] font-black uppercase tracking-widest">
+                Manipulation
+            </h3>
+
+            <button id="btn-transform-mode" class="w-full bg-blue-600 text-white py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest border border-blue-400">
+                Rotation Mode (R)
+            </button>
+        </section>
+
+        <!-- CAMERA -->
+        <section class="space-y-4">
+
+            <h3 class="text-white/40 text-[9px] font-black uppercase tracking-widest">
+                Camera
+            </h3>
+
+            <div class="space-y-3 bg-white/5 p-5 rounded-[2rem] border border-white/5">
+
+                <div class="flex justify-between text-[10px] text-gray-400 font-bold uppercase px-1">
+                    <span>Focal Length</span>
+                    <span id="focal-value">50mm</span>
+                </div>
+
+                <input type="range" id="focal-slider" min="15" max="120" value="50"/>
+
+            </div>
+        </section>
+
+        <!-- LIGHTING -->
+        <section class="space-y-4">
+
+            <h3 class="text-white/40 text-[9px] font-black uppercase tracking-widest">
+                Lighting
+            </h3>
+
+            <div class="space-y-5 bg-white/5 p-5 rounded-[2rem] border border-white/5">
+
+                <button id="btn-add-light"
+                        class="w-full bg-yellow-500 text-black py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest">
+                    Add Light
+                </button>
+
+                <div class="space-y-2">
+                    <label class="text-[10px] uppercase text-white/40 font-bold">
+                        Selected Light Type
+                    </label>
+
+                    <select id="light-type-selector"
+                            class="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white text-[11px] outline-none">
+
+                        <option value="directional">Sun</option>
+                        <option value="point">Point</option>
+                        <option value="rect">Area</option>
+
+                    </select>
+                </div>
+
+                <div class="space-y-3">
+
+                    <div class="flex justify-between text-[10px] text-gray-400 font-bold uppercase px-1">
+                        <span>Intensity</span>
+                        <span id="light-intensity-value">2</span>
+                    </div>
+
+                    <input type="range" id="light-intensity" min="0" max="20" step="0.1" value="2"/>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ENV -->
+        <section class="space-y-4">
+
+            <h3 class="text-white/40 text-[9px] font-black uppercase tracking-widest">
+                Environment
+            </h3>
+
+            <div class="space-y-4 bg-white/5 p-5 rounded-[2.5rem] border border-white/5">
+
+                <div class="flex items-center justify-between px-1">
+
+                    <div class="flex items-center gap-3">
+                        <input type="color" id="bg-color-input" value="#050505"/>
+                        <span class="text-[11px] text-white/70">BG Color</span>
+                    </div>
+
+                    <div id="env-bg-toggle-wrapper" class="hidden flex items-center gap-2">
+                        <span class="text-[11px] text-white/70">Use HDR as BG</span>
+                        <input type="checkbox" id="env-as-bg" class="w-4 h-4 accent-blue-500"/>
+                    </div>
+
+                </div>
+
+                <button id="env-btn" class="w-full bg-white/10 text-white py-3 rounded-2xl text-[10px] font-black uppercase border border-white/5">
+                    Load Environment HDR
+                </button>
+
+                <input type="file" id="env-input" class="hidden" accept="image/*"/>
+            </div>
+        </section>
+
+        <!-- MATERIAL -->
+        <section class="space-y-4">
+
+            <h3 class="text-white/40 text-[9px] font-black uppercase tracking-widest">
+                Material Props
+            </h3>
+
+            <div class="space-y-6 bg-white/5 p-6 rounded-[2.5rem] border border-white/5">
+
+                <div class="flex gap-2">
+
+                    <button id="mode-lit"
+                            class="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white border border-blue-400 transition-all">
+                        PBR (Lit)
+                    </button>
+
+                    <button id="mode-unlit"
+                            class="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white/5 text-white/40 border border-white/5 transition-all">
+                        Flat (Unlit)
+                    </button>
+
+                </div>
+
+                <div id="lit-controls" class="space-y-6">
+
+                    <div class="space-y-3">
+
+                        <div class="flex justify-between text-[10px] text-gray-400 font-bold uppercase px-1">
+                            <span>Roughness</span>
+                            <span id="val-rough">1.00</span>
+                        </div>
+
+                        <input type="range" id="input-rough" min="0" max="1" step="0.01" value="1"/>
+                    </div>
+
+                    <div class="space-y-3">
+
+                        <div class="flex justify-between text-[10px] text-gray-400 font-bold uppercase px-1">
+                            <span>Metalness</span>
+                            <span id="val-metal">0.00</span>
+                        </div>
+
+                        <input type="range" id="input-metal" min="0" max="1" step="0.01" value="0"/>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ACTION -->
+        <section class="flex flex-wrap gap-3 pt-4">
+
+            <button id="texture-btn"
+                    class="bg-white text-black px-6 py-4 rounded-2xl text-[11px] font-black uppercase flex-1 active:scale-95 transition-all">
+                Change Texture
+            </button>
+
+            <input type="file" id="texture-input" class="hidden" accept="image/*"/>
+
+            <button id="reset-cam"
+                    class="bg-white/10 text-white px-6 py-4 rounded-2xl text-[11px] font-black uppercase flex-1 active:scale-95 transition-all">
+                Reset Camera
+            </button>
+
+            <div id="anim-wrapper"
+                 class="hidden bg-white/10 px-4 py-4 rounded-2xl flex-[2] min-w-[150px] border border-white/10">
+
+                <select id="anim-selector"
+                        class="bg-transparent text-white text-[11px] w-full outline-none font-black uppercase text-center cursor-pointer"></select>
+            </div>
+            
+            <!-- RENDER -->
+            <div class="space-y-3 w-full bg-white/5 p-5 rounded-[2rem] border border-white/5">
+            
+                <h3 class="text-white/40 text-[9px] font-black uppercase tracking-widest">
+                    Render Output
+                </h3>
+            
+                <!-- RESOLUTION -->
+                <div class="flex gap-2">
+            
+                    <select id="render-quality"
+                            class="flex-1 bg-black/30 border border-white/10 rounded-xl p-3 text-white text-[11px]">
+            
+                        <option value="1">1x (Preview)</option>
+                        <option value="2">2x (HD)</option>
+                        <option value="4">4x (Ultra)</option>
+            
+                    </select>
+                    
+                    <div class="flex items-center gap-3 mt-3">
+                        <input type="checkbox"
+                               id="render-transparent"
+                               class="w-4 h-4 accent-blue-500">
+                    
+                        <span class="text-[10px] uppercase text-white/60 font-bold">
+                            Transparent Background
+                        </span>
+                    </div>
+            
+                    <button id="btn-render"
+                            class="flex-1 bg-red-500 text-white rounded-xl text-[11px] font-black uppercase">
+                        Render
+                    </button>
+            
+                </div>
+            
+            </div>
+
+        </section>
+    </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-overlay"
+     class="fixed inset-0 hidden flex flex-col items-center justify-center text-white gap-4 z-[100] bg-black/95">
+
+    <div class="w-14 h-14 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+
+    <p class="text-[10px] tracking-[0.4em] font-black uppercase text-blue-500">
+        Processing Assets...
+    </p>
+</div>
+
+<div id="canvas-container"></div>
+
+<script type="importmap">
+{
+    "imports":{
+        "three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js",
+        "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+
+import * as THREE from 'three';
+
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+let scene, camera, renderer, controls, transformControls, mixer, clock;
+
+let currentModel = null;
+let skeletonHelper = null;
+
+let bonesList = [];
+let bonesHitboxes = [];
+
+let animations = [];
+
+let isPaused = false;
+let bonesXRay = true;
+let isUnlit = false;
+let isPureMode = false;
+let isMistPass = false;
+let isNormalPass = false;
+
+const mistSettings = {
+    start: 0,
+    end: 40,
+    strength: 1.0,
+
+    nearColor: new THREE.Color("#000000"),
+    midColor: new THREE.Color("#777777"),
+    farColor: new THREE.Color("#ffffff")
+};
+
+const originalMaterials = new Map();
+
+
+let bgColor = 0x050505;
+
+const MAX_HISTORY = 5;
+
+let undoStack = [];
+let redoStack = [];
+
+const hitBoxGeo = new THREE.IcosahedronGeometry(0.2, 0);
+const hitBoxMat = new THREE.MeshBasicMaterial({
+    visible:false,
+    transparent:true,
+    opacity:0
+});
+
+const matState = {
+    roughness:1,
+    metalness:0,
+    envIntensity:1
+};
+
+let selectableObjects = [];
+
+let selectedLight = null;
+let lightObjects = [];
+
+init();
+animate();
+
+function init(){
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(bgColor);
+
+    camera = new THREE.PerspectiveCamera(
+        50,
+        window.innerWidth/window.innerHeight,
+        0.1,
+        2000
+    );
+
+    camera.position.set(20,20,20);
+
+    renderer = new THREE.WebGLRenderer({
+        antialias:true,
+        logarithmicDepthBuffer:true,
+        alpha:true
+    });
+
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    transformControls = new TransformControls(camera, renderer.domElement);
+    transformControls.setMode('rotate');
+
+    transformControls.addEventListener('dragging-changed', e=>{
+        controls.enabled = !e.value;
+    });
+
+    transformControls.addEventListener('change', ()=>{
+
+        if(currentModel){
+            currentModel.traverse(child=>{
+                if(child.isSkinnedMesh){
+                    child.skeleton.update();
+                }
+            });
+        }
+
+        updateLightVisuals();
+    });
+
+    scene.add(transformControls);
+
+    scene.add(new THREE.AmbientLight(0xffffff,0.5));
+
+    const dl = new THREE.DirectionalLight(0xffffff,1.2);
+    dl.position.set(10,20,10);
+    scene.add(dl);
+
+    clock = new THREE.Clock();
+
+    window.addEventListener('resize', onWindowResize);
+    
+    document.addEventListener('fullscreenchange', ()=>{
+
+        const btn =
+            document.getElementById('btn-fullscreen');
+    
+        if(document.fullscreenElement){
+    
+            btn.classList.add('active');
+    
+            btn.innerText = "Exit Fullscreen";
+        }
+        else{
+    
+            btn.classList.remove('active');
+    
+            btn.innerText = "Fullscreen";
+        }
+    });
+
+    renderer.domElement.addEventListener('pointerdown', onSceneClick);
+
+    setupUI();
+}
+
+function setupUI(){
+
+    const menu = document.getElementById('bottom-menu');
+
+    document.getElementById('menu-handle').onclick = ()=>{
+        menu.classList.toggle('is-open');
+    };
+
+    document.getElementById('fbx-input').onchange = e=>{
+        if(e.target.files[0]){
+            loadModel(e.target.files[0]);
+        }
+    };
+
+    document.getElementById('texture-input').onchange = e=>{
+        if(e.target.files[0]){
+            loadTexture(e.target.files[0]);
+        }
+    };
+
+    document.getElementById('env-input').onchange = e=>{
+        if(e.target.files[0]){
+            loadEnvMap(e.target.files[0]);
+        }
+    };
+
+    document.getElementById('drop-zone').onclick = ()=>{
+        document.getElementById('fbx-input').click();
+    };
+
+    document.getElementById('texture-btn').onclick = ()=>{
+        document.getElementById('texture-input').click();
+    };
+
+    document.getElementById('env-btn').onclick = ()=>{
+        document.getElementById('env-input').click();
+    };
+
+    document.getElementById('btn-add-light').onclick = ()=>{
+        createLight('directional');
+    };
+
+    document.getElementById('light-type-selector').onchange = e=>{
+        if(selectedLight){
+            replaceLightType(selectedLight, e.target.value);
+        }
+    };
+
+    document.getElementById('light-intensity').oninput = e=>{
+        if(selectedLight){
+
+            selectedLight.userData.light.intensity = parseFloat(e.target.value);
+
+            document.getElementById('light-intensity-value').innerText =
+                parseFloat(e.target.value).toFixed(1);
+        }
+    };
+
+    document.getElementById('focal-slider').oninput = e=>{
+
+        const val = parseFloat(e.target.value);
+
+        camera.setFocalLength(val);
+
+        document.getElementById('focal-value').innerText = `${val}mm`;
+    };
+
+    document.getElementById('btn-transform-mode').onclick = function(){
+
+        const mode = transformControls.mode === 'rotate'
+            ? 'translate'
+            : 'rotate';
+
+        transformControls.setMode(mode);
+
+        this.innerText =
+            mode === 'rotate'
+            ? 'Rotation Mode (R)'
+            : 'Translation Mode (G)';
+    };
+
+    document.getElementById('btn-pure-mode').onclick = function(){
+
+        isPureMode = !isPureMode;
+
+        this.classList.toggle('active', isPureMode);
+
+        togglePureMode();
+    };
+    
+    document.getElementById('btn-mist-pass').onclick = function(){
+
+        isMistPass = !isMistPass;
+        
+        if(isMistPass){
+
+            isNormalPass = false;
+        
+            document.getElementById('btn-normal-pass')
+                .classList.remove('active');
+        }
+    
+        this.classList.toggle('active', isMistPass);
+    
+        document.getElementById('mist-controls')
+            .classList.toggle('hidden', !isMistPass);
+    
+        updateMistPass();
+    };
+    
+    document.getElementById('btn-normal-pass').onclick = function(){
+
+        isNormalPass = !isNormalPass;
+    
+        this.classList.toggle('active', isNormalPass);
+    
+        // 避免同時開 Mist
+        if(isNormalPass){
+    
+            isMistPass = false;
+    
+            document.getElementById('btn-mist-pass')
+                .classList.remove('active');
+    
+            document.getElementById('mist-controls')
+                .classList.add('hidden');
+        }
+    
+        updateNormalPass();
+    };
+    
+    document.getElementById('btn-fullscreen').onclick = async function(){
+
+        if(!document.fullscreenElement){
+    
+            await document.documentElement.requestFullscreen();
+    
+            this.classList.add('active');
+    
+            this.innerText = "Exit Fullscreen";
+        }
+        else{
+    
+            await document.exitFullscreen();
+    
+            this.classList.remove('active');
+    
+            this.innerText = "Fullscreen";
+        }
+    };
+
+    document.getElementById('btn-show-bones').onclick = function(){
+
+        if(!skeletonHelper) return;
+
+        skeletonHelper.visible = !skeletonHelper.visible;
+
+        this.classList.toggle('active', skeletonHelper.visible);
+
+        this.innerText =
+            skeletonHelper.visible
+            ? 'Hide Bones'
+            : 'Show Bones';
+    };
+
+    document.getElementById('btn-xray-bones').onclick = function(){
+
+        bonesXRay = !bonesXRay;
+
+        this.classList.toggle('active', bonesXRay);
+
+        updateBonesXRay();
+    };
+
+    document.getElementById('btn-pause-anim').onclick = function(){
+
+        isPaused = !isPaused;
+
+        this.classList.toggle('active', isPaused);
+
+        this.innerText =
+            isPaused
+            ? 'Resume Anim'
+            : 'Pause Anim';
+    };
+
+    document.getElementById('mode-lit').onclick = ()=>{
+
+        isUnlit = false;
+
+        toggleShadingUI();
+
+        updateAllMaterials();
+    };
+
+    document.getElementById('mode-unlit').onclick = ()=>{
+
+        isUnlit = true;
+
+        toggleShadingUI();
+
+        updateAllMaterials();
+    };
+
+    document.getElementById('input-rough').oninput = e=>{
+
+        matState.roughness = parseFloat(e.target.value);
+
+        document.getElementById('val-rough').innerText =
+            matState.roughness.toFixed(2);
+
+        updateAllMaterials();
+    };
+
+    document.getElementById('input-metal').oninput = e=>{
+
+        matState.metalness = parseFloat(e.target.value);
+
+        document.getElementById('val-metal').innerText =
+            matState.metalness.toFixed(2);
+
+        updateAllMaterials();
+    };
+
+    document.getElementById('reset-cam').onclick = ()=>{
+
+        camera.position.set(20,20,20);
+
+        controls.target.set(0,2,0);
+    };
+
+    document.getElementById('anim-selector').onchange = e=>{
+
+        if(!mixer) return;
+
+        mixer.stopAllAction();
+
+        mixer.clipAction(animations[e.target.value]).play();
+    };
+
+    document.getElementById('bg-color-input').oninput = e=>{
+
+        bgColor = e.target.value;
+
+        if(
+            !document.getElementById('env-as-bg').checked
+            || isPureMode
+        ){
+            scene.background = new THREE.Color(bgColor);
+        }
+    };
+
+    document.getElementById('env-as-bg').onchange = e=>{
+
+        if(!isPureMode){
+
+            scene.background =
+                (e.target.checked && scene.environment)
+                ? scene.environment
+                : new THREE.Color(bgColor);
+        }
+    };
+    
+    document.getElementById('mist-start').oninput = e=>{
+
+        mistSettings.start = parseFloat(e.target.value);
+    
+        document.getElementById('mist-start-val').innerText =
+            mistSettings.start;
+    
+        if(isMistPass) updateMistPass();
+    };
+    
+    document.getElementById('mist-end').oninput = e=>{
+    
+        mistSettings.end = parseFloat(e.target.value);
+    
+        document.getElementById('mist-end-val').innerText =
+            mistSettings.end;
+    
+        if(isMistPass) updateMistPass();
+    };
+    
+    document.getElementById('mist-strength').oninput = e=>{
+    
+        mistSettings.strength = parseFloat(e.target.value);
+    
+        document.getElementById('mist-strength-val').innerText =
+            mistSettings.strength.toFixed(2);
+    
+        if(isMistPass) updateMistPass();
+    };
+    
+    document.getElementById('mist-near').oninput = e=>{
+    
+        mistSettings.nearColor.set(e.target.value);
+    
+        if(isMistPass) updateMistPass();
+    };
+    
+    document.getElementById('mist-mid').oninput = e=>{
+    
+        mistSettings.midColor.set(e.target.value);
+    
+        if(isMistPass) updateMistPass();
+    };
+    
+    document.getElementById('mist-far').oninput = e=>{
+    
+        mistSettings.farColor.set(e.target.value);
+    
+        if(isMistPass) updateMistPass();
+    };
+    
+    document.getElementById('btn-render').onclick = ()=>{
+        renderImage();
+    };
+
+}
+
+function createLight(type='directional'){
+
+    const group = new THREE.Group();
+
+    let light;
+    let visual;
+
+    if(type === 'directional'){
+
+        light = new THREE.DirectionalLight(0xffffff,2);
+
+        visual = new THREE.Mesh(
+            new THREE.BoxGeometry(1.5,0.3,3),
+            new THREE.MeshBasicMaterial({
+                color:0xffcc00,
+                wireframe:true
+            })
+        );
+    }
+
+    if(type === 'point'){
+
+        light = new THREE.PointLight(0xffffff,2);
+
+        visual = new THREE.Mesh(
+            new THREE.SphereGeometry(0.6,16,16),
+            new THREE.MeshBasicMaterial({
+                color:0x00ffff,
+                wireframe:true
+            })
+        );
+    }
+
+    if(type === 'rect'){
+
+        light = new THREE.RectAreaLight(0xffffff,2,5,5);
+
+        visual = new THREE.Mesh(
+            new THREE.PlaneGeometry(5,5),
+            new THREE.MeshBasicMaterial({
+                color:0xff00ff,
+                wireframe:true,
+                side:THREE.DoubleSide
+            })
+        );
+    }
+
+    group.add(light);
+    group.add(visual);
+
+    group.position.set(0,5,0);
+
+    group.userData.light = light;
+    group.userData.visual = visual;
+    group.userData.type = type;
+
+    scene.add(group);
+
+    lightObjects.push(group);
+    selectableObjects.push(visual);
+
+    selectLight(group);
+
+    updateLightVisibility();
+}
+
+function replaceLightType(group, type){
+
+    const oldLight = group.userData.light;
+    const oldVisual = group.userData.visual;
+
+    group.remove(oldLight);
+    group.remove(oldVisual);
+
+    let newLight;
+    let newVisual;
+
+    if(type === 'directional'){
+
+        newLight = new THREE.DirectionalLight(0xffffff,2);
+
+        newVisual = new THREE.Mesh(
+            new THREE.BoxGeometry(1.5,0.3,3),
+            new THREE.MeshBasicMaterial({
+                color:0xffcc00,
+                wireframe:true
+            })
+        );
+    }
+
+    if(type === 'point'){
+
+        newLight = new THREE.PointLight(0xffffff,2);
+
+        newVisual = new THREE.Mesh(
+            new THREE.SphereGeometry(0.6,16,16),
+            new THREE.MeshBasicMaterial({
+                color:0x00ffff,
+                wireframe:true
+            })
+        );
+    }
+
+    if(type === 'rect'){
+
+        newLight = new THREE.RectAreaLight(0xffffff,2,5,5);
+
+        newVisual = new THREE.Mesh(
+            new THREE.PlaneGeometry(5,5),
+            new THREE.MeshBasicMaterial({
+                color:0xff00ff,
+                wireframe:true,
+                side:THREE.DoubleSide
+            })
+        );
+    }
+
+    newLight.position.copy(oldLight.position);
+
+    group.add(newLight);
+    group.add(newVisual);
+
+    group.userData.light = newLight;
+    group.userData.visual = newVisual;
+    group.userData.type = type;
+
+    selectableObjects = selectableObjects.filter(x=>x !== oldVisual);
+    selectableObjects.push(newVisual);
+
+    selectLight(group);
+
+    updateLightVisibility();
+}
+
+function selectLight(group){
+
+    selectedLight = group;
+
+    transformControls.attach(group);
+
+    document.getElementById('selected-bone-info').innerText =
+        `Light: ${group.userData.type}`;
+
+    const selector = document.getElementById('light-type-selector');
+
+    selector.value = group.userData.type;
+
+    document.getElementById('light-intensity').value =
+        group.userData.light.intensity;
+
+    document.getElementById('light-intensity-value').innerText =
+        group.userData.light.intensity.toFixed(1);
+}
+
+function updateLightVisibility(){
+
+    lightObjects.forEach(g=>{
+        g.userData.visual.visible = !isPureMode;
+    });
+}
+
+function updateLightVisuals(){
+}
+
+function togglePureMode(){
+
+    if(isPureMode){
+
+        scene.background = new THREE.Color(bgColor);
+
+        if(skeletonHelper){
+            skeletonHelper.visible = false;
+        }
+
+        transformControls.detach();
+
+        document.getElementById('selected-bone-info').innerText =
+            "Bone: None";
+
+        document.getElementById('btn-show-bones').classList.remove('active');
+
+        document.getElementById('btn-show-bones').innerText =
+            'Show Bones';
+    }
+    else{
+
+        const envAsBg =
+            document.getElementById('env-as-bg').checked;
+
+        scene.background =
+            (envAsBg && scene.environment)
+            ? scene.environment
+            : new THREE.Color(bgColor);
+    }
+
+    updateLightVisibility();
+}
+
+function toggleShadingUI(){
+
+    const litBtn = document.getElementById('mode-lit');
+    const unlitBtn = document.getElementById('mode-unlit');
+    const litCtrls = document.getElementById('lit-controls');
+
+    if(isUnlit){
+
+        unlitBtn.className =
+            "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white border border-blue-400 transition-all";
+
+        litBtn.className =
+            "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white/5 text-white/40 border border-white/5 transition-all";
+
+        litCtrls.classList.add('opacity-30','pointer-events-none');
+    }
+    else{
+
+        litBtn.className =
+            "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white border border-blue-400 transition-all";
+
+        unlitBtn.className =
+            "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white/5 text-white/40 border border-white/5 transition-all";
+
+        litCtrls.classList.remove('opacity-30','pointer-events-none');
+    }
+}
+
+function updateBonesXRay(){
+
+    if(!skeletonHelper) return;
+
+    skeletonHelper.traverse(child=>{
+
+        if(child.material){
+
+            child.material.depthTest = !bonesXRay;
+
+            child.material.transparent = true;
+
+            child.renderOrder = bonesXRay ? 999 : 0;
+        }
+    });
+}
+
+async function loadModel(file){
+
+    const loader = new FBXLoader();
+
+    const reader = new FileReader();
+
+    document.getElementById('loading-overlay')
+        .classList.replace('hidden','flex');
+
+    reader.onload = e=>{
+
+        try{
+
+            const object = loader.parse(e.target.result,'');
+
+            if(currentModel){
+                scene.remove(currentModel);
+            }
+
+            if(skeletonHelper){
+                scene.remove(skeletonHelper);
+            }
+
+            currentModel = object;
+
+            bonesList = [];
+            bonesHitboxes = [];
+
+            const box = new THREE.Box3().setFromObject(object);
+
+            const size = box.getSize(new THREE.Vector3());
+
+            const scale =
+                15 / (Math.max(size.x,size.y,size.z) || 1);
+
+            object.scale.setScalar(scale);
+
+            object.traverse(child=>{
+
+                if(child.isBone){
+
+                    bonesList.push(child);
+
+                    let hitBox = new THREE.Mesh(hitBoxGeo, hitBoxMat);
+
+                    hitBox.name = "BONE_HITBOX";
+
+                    hitBox.visible = false;
+
+                    child.add(hitBox);
+
+                    bonesHitboxes.push(hitBox);
+                }
+            });
+
+            updateAllMaterials();
+
+            skeletonHelper = new THREE.SkeletonHelper(object);
+
+            skeletonHelper.visible = false;
+
+            scene.add(skeletonHelper);
+
+            scene.add(object);
+
+            updateBonesXRay();
+
+            document.getElementById('upload-hub').classList.add('hidden');
+
+            document.getElementById('bottom-menu').classList.remove('hidden');
+
+            document.getElementById('info-panel').classList.remove('hidden');
+
+            document.getElementById('model-name').innerText = file.name;
+
+            document.getElementById('poly-count').innerText =
+                `Polys: ${Math.floor(countPolys(object)).toLocaleString()}`;
+
+            if(object.animations?.length > 0){
+
+                animations = object.animations;
+
+                mixer = new THREE.AnimationMixer(object);
+
+                const sel = document.getElementById('anim-selector');
+
+                sel.innerHTML =
+                    animations.map((c,i)=>
+                        `<option value="${i}">${c.name || 'Anim '+i}</option>`
+                    ).join('');
+
+                document.getElementById('anim-wrapper')
+                    .classList.remove('hidden');
+
+                mixer.clipAction(animations[0]).play();
+            }
+
+            document.getElementById('loading-overlay')
+                .classList.replace('flex','hidden');
+
+        }
+        catch(err){
+
+            alert("FBX Loading Error");
+
+            console.error(err);
+
+            document.getElementById('loading-overlay')
+                .classList.replace('flex','hidden');
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+function loadTexture(file){
+
+    const reader = new FileReader();
+
+    reader.onload = e=>{
+
+        const tex = new THREE.TextureLoader().load(e.target.result);
+
+        tex.colorSpace = THREE.SRGBColorSpace;
+
+        currentModel.traverse(c=>{
+
+            if(c.isMesh){
+
+                c.material.map = tex;
+
+                c.material.needsUpdate = true;
+            }
+        });
+    };
+
+    reader.readAsDataURL(file);
+}
+
+function loadEnvMap(file){
+
+    const reader = new FileReader();
+
+    reader.onload = e=>{
+
+        new THREE.TextureLoader().load(e.target.result, tex=>{
+
+            tex.mapping = THREE.EquirectangularReflectionMapping;
+
+            tex.colorSpace = THREE.SRGBColorSpace;
+
+            scene.environment = tex;
+
+            document.getElementById('env-bg-toggle-wrapper')
+                .classList.remove('hidden');
+
+            updateAllMaterials();
+        });
+    };
+
+    reader.readAsDataURL(file);
+}
+
+function updateNormalPass(){
+
+    if(!currentModel) return;
+
+    currentModel.traverse(c=>{
+
+        if(!c.isMesh) return;
+
+        if(isNormalPass){
+
+            if(!originalMaterials.has(c.uuid)){
+                originalMaterials.set(c.uuid, c.material);
+            }
+
+            const mat = new THREE.ShaderMaterial({
+
+                skinning: !!c.skeleton,
+
+                vertexShader:`
+
+                    varying vec3 vNormal;
+                
+                    #include <common>
+                    #include <skinning_pars_vertex>
+                
+                    void main(){
+                
+                        #include <skinbase_vertex>
+                        #include <beginnormal_vertex>
+                        #include <skinnormal_vertex>
+                        #include <begin_vertex>
+                        #include <skinning_vertex>
+                
+                        vNormal =
+                            normalize(
+                                normalMatrix * objectNormal
+                            );
+                
+                        gl_Position =
+                            projectionMatrix *
+                            modelViewMatrix *
+                            vec4(transformed,1.0);
+                    }
+                `,
+
+                fragmentShader:`
+
+                    varying vec3 vNormal;
+
+                    void main(){
+
+                        vec3 n =
+                            normalize(vNormal);
+
+                        n = n * 0.5 + 0.5;
+
+                        gl_FragColor =
+                            vec4(n,1.0);
+                    }
+                `
+            });
+
+            c.material = mat;
+        }
+        else{
+
+            if(originalMaterials.has(c.uuid)){
+
+                c.material =
+                    originalMaterials.get(c.uuid);
+            }
+        }
+    });
+}
+
+function updateMistPass(){
+
+    if(!currentModel) return;
+
+    currentModel.traverse(c=>{
+
+        if(!c.isMesh) return;
+
+        if(isMistPass){
+
+            if(!originalMaterials.has(c.uuid)){
+                originalMaterials.set(c.uuid, c.material);
+            }
+
+            const mat = new THREE.ShaderMaterial({
+            
+                skinning: !!c.skeleton,
+
+                uniforms:{
+
+                    cameraPos:{
+                        value: camera.position
+                    },
+
+                    startDist:{
+                        value: mistSettings.start
+                    },
+
+                    endDist:{
+                        value: mistSettings.end
+                    },
+
+                    strength:{
+                        value: mistSettings.strength
+                    },
+
+                    nearColor:{
+                        value: mistSettings.nearColor
+                    },
+
+                    midColor:{
+                        value: mistSettings.midColor
+                    },
+
+                    farColor:{
+                        value: mistSettings.farColor
+                    }
+
+                },
+
+                vertexShader:`
+
+                    varying vec3 vWorldPos;
+                
+                    #include <common>
+                    #include <skinning_pars_vertex>
+                
+                    void main(){
+                
+                        #include <skinbase_vertex>
+                        #include <beginnormal_vertex>
+                        #include <skinnormal_vertex>
+                        #include <begin_vertex>
+                        #include <skinning_vertex>
+                
+                        vec4 worldPos =
+                            modelMatrix *
+                            vec4(transformed,1.0);
+                
+                        vWorldPos = worldPos.xyz;
+                
+                        gl_Position =
+                            projectionMatrix *
+                            viewMatrix *
+                            worldPos;
+                    }
+                `,
+
+                fragmentShader:`
+
+                    varying vec3 vWorldPos;
+
+                    uniform vec3 cameraPos;
+
+                    uniform float startDist;
+                    uniform float endDist;
+                    uniform float strength;
+
+                    uniform vec3 nearColor;
+                    uniform vec3 midColor;
+                    uniform vec3 farColor;
+
+                    void main(){
+
+                        float dist =
+                            distance(cameraPos, vWorldPos);
+
+                        float t =
+                            clamp(
+                                (dist - startDist)
+                                / (endDist - startDist),
+                                0.0,
+                                1.0
+                            );
+
+                        t = pow(t, strength);
+
+                        vec3 col;
+
+                        if(t < 0.5){
+
+                            col =
+                                mix(
+                                    nearColor,
+                                    midColor,
+                                    t * 2.0
+                                );
+                        }
+                        else{
+
+                            col =
+                                mix(
+                                    midColor,
+                                    farColor,
+                                    (t - 0.5) * 2.0
+                                );
+                        }
+
+                        gl_FragColor = vec4(col,1.0);
+                    }
+                `
+            });
+
+            c.material = mat;
+        }
+        else{
+
+            if(originalMaterials.has(c.uuid)){
+
+                c.material =
+                    originalMaterials.get(c.uuid);
+            }
+        }
+    });
+}
+
+function updateAllMaterials(){
+
+    if(isMistPass){
+        updateMistPass();
+        return;
+    }
+    
+    if(isNormalPass){
+        updateNormalPass();
+        return;
+    }
+    
+    if(!currentModel) return;
+
+    currentModel.traverse(c=>{
+
+        if(c.isMesh){
+
+            const oldTex = c.material.map;
+
+            if(isUnlit){
+
+                c.material = new THREE.MeshBasicMaterial({
+                    map:oldTex,
+                    transparent:true,
+                    alphaTest:0.5
+                });
+            }
+            else{
+
+                c.material = new THREE.MeshStandardMaterial({
+                    map:oldTex,
+                    roughness:matState.roughness,
+                    metalness:matState.metalness,
+                    envMap:scene.environment,
+                    envMapIntensity:matState.envIntensity,
+                    transparent:true,
+                    alphaTest:0.5
+                });
+            }
+
+            c.material.needsUpdate = true;
+        }
+    });
+}
+
+function onSceneClick(event){
+
+    if(transformControls.dragging || !currentModel) return;
+
+    const rect = renderer.domElement.getBoundingClientRect();
+
+    const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+
+    const raycaster = new THREE.Raycaster();
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const allTargets = [
+        ...bonesHitboxes,
+        ...selectableObjects
+    ];
+
+    const intersects =
+        raycaster.intersectObjects(allTargets, true);
+
+    if(intersects.length > 0){
+
+        const obj = intersects[0].object;
+
+        const foundLight = lightObjects.find(
+            l=>l.userData.visual === obj
+        );
+
+        if(foundLight){
+
+            selectLight(foundLight);
+
+            return;
+        }
+
+        const bone = obj.parent;
+
+        transformControls.attach(bone);
+
+        document.getElementById('selected-bone-info').innerText =
+            `Bone: ${bone.name}`;
+    }
+    else{
+
+        if(!transformControls.axis){
+
+            transformControls.detach();
+
+            document.getElementById('selected-bone-info').innerText =
+                "Bone: None";
+        }
+    }
+}
+
+function countPolys(obj){
+
+    let n = 0;
+
+    obj.traverse(c=>{
+
+        if(c.isMesh){
+
+            n += c.geometry.attributes.position.count / 3;
+        }
+    });
+
+    return n;
+}
+
+function onWindowResize(){
+
+    camera.aspect =
+        window.innerWidth / window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate(){
+
+    requestAnimationFrame(animate);
+
+    const d = clock.getDelta();
+
+    if(mixer && !isPaused){
+        mixer.update(d);
+    }
+
+    controls.update();
+
+    renderer.render(scene, camera);
+}
+
+function renderImage(){
+
+    const scale = parseInt(document.getElementById('render-quality').value);
+    
+    const transparent =
+        document.getElementById('render-transparent').checked;
+
+    const width = window.innerWidth * scale;
+    const height = window.innerHeight * scale;
+
+    const oldSize = renderer.getSize(new THREE.Vector2());
+    const oldPixelRatio = renderer.getPixelRatio();
+    
+    const oldBackground = scene.background;
+    if(transparent){
+        scene.background = null;
+    }
+
+    renderer.setSize(width, height, false);
+    renderer.setPixelRatio(1);
+    renderer.toneMappingExposure = 1.0;
+
+    renderer.render(scene, camera);
+
+    const dataURL = renderer.domElement.toDataURL("image/png");
+
+    downloadImage(dataURL);
+
+    renderer.setSize(oldSize.x, oldSize.y, false);
+    renderer.setPixelRatio(oldPixelRatio);
+}
+
+function downloadImage(dataURL){
+
+    const a = document.createElement("a");
+
+    a.href = dataURL;
+    a.download = "fbx_render" + Date.now() + ".png";
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+</script>
+</body>
+</html>
