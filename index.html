@@ -157,26 +157,13 @@
 <body>
 
 <!-- TOP BAR -->
-<div class="fixed top-4 left-4 right-4 pointer-events-none z-10 flex justify-between items-start">
-    <div class="bg-black/60 backdrop-blur-md p-3 rounded-2xl border border-white/10 text-white pointer-events-auto shadow-2xl">
-        <h1 class="text-[10px] font-black uppercase tracking-widest text-blue-500">
-            FBX Studio V9
-        </h1>
+<div class="fixed top-3 left-3 pointer-events-none z-10">
+
+    <div id="selected-bone-info"
+         class="text-white text-[11px] font-mono opacity-70">
+        Bone: None
     </div>
 
-    <div id="info-panel" class="hidden bg-black/60 backdrop-blur-md p-3 rounded-2xl border border-white/10 text-white text-[10px] pointer-events-auto min-w-[140px]">
-        <div id="model-name" class="font-bold truncate max-w-[120px]">
-            No Model Loaded
-        </div>
-
-        <div id="selected-bone-info" class="text-blue-400 mt-1 font-mono">
-            Bone: None
-        </div>
-
-        <div id="poly-count" class="opacity-40 mt-1">
-            Polys: 0
-        </div>
-    </div>
 </div>
 
 <!-- UPLOAD -->
@@ -228,11 +215,11 @@
                 </h3>
 
                 <div class="flex gap-2">
-                    <button id="btn-undo" disabled class="action-btn px-4 py-1.5 bg-white/10 text-white rounded-lg text-[10px] font-bold uppercase border border-white/10 transition-all">
+                    <button id="btn-undo" class="action-btn px-4 py-1.5 bg-white/10 text-white rounded-lg text-[10px] font-bold uppercase border border-white/10 transition-all">
                         Undo
                     </button>
 
-                    <button id="btn-redo" disabled class="action-btn px-4 py-1.5 bg-white/10 text-white rounded-lg text-[10px] font-bold uppercase border border-white/10 transition-all">
+                    <button id="btn-redo" class="action-btn px-4 py-1.5 bg-white/10 text-white rounded-lg text-[10px] font-bold uppercase border border-white/10 transition-all">
                         Redo
                     </button>
                 </div>
@@ -387,6 +374,18 @@
                         <option value="rect">Area</option>
 
                     </select>
+                    <!-- LIGHT COLOR -->
+                    <div class="space-y-2">
+                    
+                        <div class="flex justify-between text-[10px] text-gray-400 font-bold uppercase px-1">
+                            <span>Light Color</span>
+                        </div>
+                    
+                        <input type="color"
+                               id="light-color"
+                               value="#ffffff"
+                               class="w-full h-12 rounded-xl bg-transparent border border-white/10 cursor-pointer">
+                    </div>
                 </div>
 
                 <div class="space-y-3">
@@ -693,8 +692,17 @@ function init(){
     transformControls = new TransformControls(camera, renderer.domElement);
     transformControls.setMode('rotate');
 
-    transformControls.addEventListener('dragging-changed', e=>{
+    transformControls.addEventListener(
+    'dragging-changed',
+    
+    (e)=>{
+    
         controls.enabled = !e.value;
+    
+        if(!e.value){
+    
+            saveHistory();
+        }
     });
 
     transformControls.addEventListener('change', ()=>{
@@ -1068,7 +1076,171 @@ function setupUI(){
     document.getElementById('btn-render').onclick = ()=>{
         renderImage();
     };
+    
+    document.getElementById('light-color').oninput = (e)=>{
+    
+        if(!selectedLight) return;
+    
+        const realLight =
+            selectedLight.userData.light;
+    
+        if(!realLight) return;
+    
+        realLight.color.set(e.target.value);
+    };
+    
+    document.getElementById('btn-undo').onclick = performUndo;
+    document.getElementById('btn-redo').onclick = performRedo;
 
+}
+
+function getSceneSnapshot(){
+
+    return {
+
+        bones: bonesList.map(bone=>({
+
+            id: bone.uuid,
+
+            pos: bone.position.clone(),
+
+            rot: bone.quaternion.clone(),
+
+            scl: bone.scale.clone()
+        })),
+
+        lights: scene.children
+        .filter(o=>o.userData.isCustomLight)
+        .map(o=>({
+
+            id: o.uuid,
+
+            pos: o.position.clone(),
+
+            rot: o.quaternion.clone(),
+
+            scl: o.scale.clone(),
+
+            color: o.userData.light
+                ? o.userData.light.color.clone()
+                : new THREE.Color(1,1,1)
+        })),
+
+    };
+}
+
+function applySceneSnapshot(snapshot){
+
+    if(!snapshot) return;
+
+    // BONES
+    snapshot.bones.forEach(data=>{
+
+        const bone =
+            bonesList.find(b=>b.uuid===data.id);
+
+        if(bone){
+
+            bone.position.copy(data.pos);
+
+            bone.quaternion.copy(data.rot);
+
+            bone.scale.copy(data.scl);
+        }
+    });
+
+    // LIGHTS
+    snapshot.lights.forEach(data=>{
+
+        const obj =
+            scene.children.find(o=>o.uuid===data.id);
+
+        if(obj){
+
+            obj.position.copy(data.pos);
+
+            obj.quaternion.copy(data.rot);
+
+            obj.scale.copy(data.scl);
+
+            if(obj.userData.light){
+
+                obj.userData.light.color.copy(data.color);
+            }
+        }
+    });
+
+    // UPDATE SKIN
+    if(currentModel){
+
+        currentModel.traverse(c=>{
+
+            if(c.isSkinnedMesh){
+
+                c.skeleton.update();
+            }
+        });
+    }
+}
+
+function saveHistory(){
+
+    const snapshot =
+        getSceneSnapshot();
+
+    undoStack.push(snapshot);
+
+    // 限制 stack 大小
+    if(undoStack.length > MAX_HISTORY){
+
+        undoStack.shift();
+    }
+
+    redoStack = [];
+
+    updateHistoryButtons();
+}
+
+function performUndo(){
+
+    if(undoStack.length <= 1) return;
+
+    const current =
+        undoStack.pop();
+
+    redoStack.push(current);
+
+    const previous =
+        undoStack[undoStack.length - 1];
+
+    applySceneSnapshot(previous);
+
+    updateHistoryButtons();
+}
+
+function performRedo(){
+
+    if(redoStack.length === 0) return;
+
+    const snapshot =
+        redoStack.pop();
+
+    undoStack.push(snapshot);
+
+    applySceneSnapshot(snapshot);
+
+    updateHistoryButtons();
+}
+
+function updateHistoryButtons(){
+
+    document.getElementById('btn-undo')
+        .disabled =
+        undoStack.length <= 1;
+
+    document.getElementById('btn-redo')
+        .disabled =
+        redoStack.length === 0;
 }
 
 function createLight(type='directional'){
@@ -1223,6 +1395,9 @@ function selectLight(group){
 
     document.getElementById('light-intensity-value').innerText =
         group.userData.light.intensity.toFixed(1);
+        
+    document.getElementById('light-color').value =
+        "#" + selectedLight.userData.light.color.getHexString();
 }
 
 function updateLightVisibility(){
@@ -1378,6 +1553,8 @@ async function loadModel(file){
             scene.add(skeletonHelper);
 
             scene.add(object);
+            
+            saveHistory();
 
             updateBonesXRay();
 
@@ -1387,10 +1564,6 @@ async function loadModel(file){
 
             document.getElementById('info-panel').classList.remove('hidden');
 
-            document.getElementById('model-name').innerText = file.name;
-
-            document.getElementById('poly-count').innerText =
-                `Polys: ${Math.floor(countPolys(object)).toLocaleString()}`;
 
             if(object.animations?.length > 0){
 
@@ -1416,8 +1589,6 @@ async function loadModel(file){
 
         }
         catch(err){
-
-            alert("FBX Loading Error");
 
             console.error(err);
 
